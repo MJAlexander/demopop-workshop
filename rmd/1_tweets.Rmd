@@ -1,0 +1,202 @@
+---
+title: "Extracting information from Twitter"
+author: "Monica Alexander"
+date: "DemPop WorkShop, April 29 2022"
+output: 
+  pdf_document:
+    toc: true
+    number_sections: true
+fontsize: 12pt
+header-includes: \usepackage{setspace} \onehalfspacing
+urlcolor: blue
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, eval = TRUE)
+```
+
+# Overview
+
+This module takes you through the basics of extracting information from Twitter using functions from the `rtweet` package. We will cover how to extract information about a specific user; how to extract information about a specific keyword/topic; and how to extract tweets based on location. 
+
+Notes:
+
+- This is an R Markdown document. If you would like to knit this document to a pdf, press the "Knit" button in RStudio. 
+- The settings in this document are such that when you knit the document, the code is not evaluated (see line 13 in the R Markdown document where it says `eval = FALSE`). This is so you don't make calls to the Twitter API everytime you knit the document. If you would like to eventually change this, just replace `FALSE` with `TRUE` above. 
+
+
+## Load packages
+
+First, let's load in the packages we'll be using in this module:
+
+```{r}
+library(rtweet)
+library(tidyverse)
+library(here)
+library(lubridate)
+library(scales)
+```
+
+# Focusing on a user
+
+Firstly, let's extract some information about a particular Twitter user. I'm using the Cedeplar Twitter account as an example. We can get some basic info using the `lookup_users` function. This returns a "tibble" (data frame) with 90 columns. Some of the info is related to the user in general, and some of the info is related to the most recent tweets.
+
+```{r}
+cedeplar_info <- lookup_users("Cedeplar")
+
+# for example, pull out self-reported location
+cedeplar_info$location
+
+cedeplar_info %>% 
+  select(location)
+```
+
+
+# Focusing on a topic
+
+Now let's move on to extracting tweets about a particular topic. The `search_tweets` function is the key here. For example, let's do a little search for tweets that include the term "life expectancy". The `include_rts` argument indicates whether or not you want to also include tweets that are retweets. 
+
+```{r}
+le_tweets <- search_tweets("life expectancy", 
+                           n = 100, 
+                           include_rts = FALSE)
+```
+
+In practice, if we were collecting tweets about life expectancy for a research project, we'd probably want to do multiple searches over time. Save the previous output first:
+
+```{r}
+write_rds(le_tweets, here("output/le_tweets.RDS"))
+```
+
+Then imagine we came back and wanted to do an updated search. Ideally we would want to restrict the search to only return tweets that are more recent than our previous search. You can control this through the use of the `since_id` function. 
+
+```{r}
+
+# open previous extract
+le_tweets <- read_rds(here("output/le_tweets.RDS"))
+
+# get the most recent tweet from previous extract
+oldest_tweet <- max(le_tweets$status_id)
+
+# get more tweets
+le_tweets_2 <- search_tweets("life expectancy", 
+                             n = 100, 
+                             include_rts = FALSE,
+                             since_id = oldest_tweet)
+
+le_tweets_update <- bind_rows(le_tweets, le_tweets_2)
+
+# and then could save this updated version
+
+```
+
+Let's plot this: 
+
+```{r}
+le_tweets_update %>% 
+  ts_plot("hours") + 
+  geom_point() + 
+  labs(title = "Tweets about life expectancy by hour") + 
+  theme_bw(base_size = 14)
+```
+
+# Focusing on a place
+
+Finally, in addition to searching for particular topics, we can restrict our searches to be based on particular locations. For example, the following chunk of code searches for 100 tweets within a 100 mile radius of Cedeplar (It's easy to Google the latitude and longitude of places you're interested in):
+
+```{r}
+location_tweets <- search_tweets(
+  geocode =  "-19.8,-43.96,100mi",
+  n = 100
+)
+```
+
+# How representative is Twitter data?
+
+If you're thinking about using Twitter data in demographic research, a natural question to ask is how the representative of the general population are the people tweeting? We could, for example, compare locations of tweets versus populations by region. In this section, we compare the frequency of tweets in Canadian extracted at a particular time to the distribution of the Canadian population, to see how representative (or not) tweeters are based on location.  
+
+## A note on geocoding tweets
+
+A small percentage of tweets have a geolocation (like those above), but most don't. You can increase the sample of tweets that have a location by geocoding yourself, using self-reported location data and the Google maps API (e.g. the `tidygeocoder` R package is awesome). I won't be going through this today, but there's some more info and a demonstration [here](https://github.com/MJAlexander/social_media_workshop/blob/main/rmd/2_geocoding_mapping.Rmd).
+
+
+## Load in Canadian tweets 
+
+For this exercise, I'm using some tweets I've already extracted and geocoded. 
+
+```{r}
+load(here("data/can_gc.Rda"))
+```
+
+## Calculate number and proportion by province
+
+Now we can calculate the proportion of all tweets by province:
+
+```{r}
+can_tweets_province <- can_gc %>% 
+  group_by(province) %>% 
+  tally() %>% 
+  mutate(prop = n/sum(n))
+can_tweets_province
+```
+## Load in population estimates
+
+Now we want to compare these proportions to the population distribution. First, let's load in population estimates from StatCan. I downloaded the data from [here](https://www150.statcan.gc.ca/t1/tbl1/en/tv.action?pid=1710000901).
+
+```{r}
+can_pop <- read_csv(here("data/canadian_population.csv"))
+```
+
+
+Now we want to compute the proportion of the total Canadian population by province/territory:
+
+```{r}
+can_pop <- can_pop %>% 
+  mutate(prop = population/sum(population))
+```
+
+## Compare distributions
+
+Let's compare the distributions. First up, we need to clean up the Twitter province names so they are the same as the population ones.
+
+```{r}
+can_tweets_province <- can_tweets_province %>% 
+  mutate(province = str_remove(province, "/.*")) %>% 
+  mutate(province = str_trim(province)) %>% 
+  rename(n_tweets = n, prop_tweets = prop)
+```
+
+Join the two proportions together and have a look. It seems that Ontario is wildly over-represented. 
+
+```{r}
+can_pop %>% 
+  left_join(can_tweets_province) %>% 
+  select(-population, -n_tweets) %>% 
+  mutate_at(.vars = vars(prop:prop_tweets), funs(round(., 2))) %>% 
+  arrange(-prop)
+```
+We can also plot these proportions to better visualize differences in proportions. First, some tidyverse to get the data into a easy plotting format:
+
+```{r}
+props_long <- can_pop %>% 
+  left_join(can_tweets_province) %>% 
+  select(-population, -n_tweets) %>% 
+  mutate(province = fct_reorder(province, prop)) %>% 
+  pivot_longer(-province, names_to = "source", values_to = "prop") %>% 
+  mutate(source = ifelse(source == "prop", "StatCan", "Twitter")) 
+```
+
+Now plot:
+
+
+```{r}
+ggplot(props_long, aes(province, prop, fill = source)) + 
+  geom_bar(stat = "identity", position = "dodge") + 
+  coord_flip() + 
+  labs(title = "Canadian population and tweets",
+       caption = "Tweets collected April 25 2021 using rtweet",
+       x = NULL,
+       y = "proportion of total") + 
+  theme_bw(base_size = 14) + 
+  scale_fill_brewer(palette = "Set1")
+```
