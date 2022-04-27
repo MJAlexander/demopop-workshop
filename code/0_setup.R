@@ -21,6 +21,7 @@ library(rtweet)
 library(tidytext)
 library(lubridate)
 library(scales)
+library(rvest)
 library(topicmodels)
 
 
