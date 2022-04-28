@@ -1,0 +1,340 @@
+---
+title: "Webscraping and text analysis of articles from *Demography*"
+author: "Monica Alexander"
+date: "DemPop WorkShop, April 29 2022"
+output: 
+  pdf_document:
+    toc: true
+    number_sections: true
+fontsize: 12pt
+header-includes: \usepackage{setspace} \onehalfspacing
+urlcolor: blue
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, eval = FALSE)
+```
+
+# Overview
+
+In this module we'll cover a brief intro to webscraping using `rvest`, then some basic text analysis tools. We are going to be extracting and analyzing journal articles published in [*Demography*](https://read.dukeupress.edu/demography) from 2011. This is now a fully open-access journal and more recent articles are published on their website. 
+
+
+## Load packages
+
+Load in the packages we'll be using in this module:
+
+```{r}
+library(tidyverse)
+library(here)
+library(tidytext)
+library(topicmodels)
+library(rvest)
+```
+
+
+# Extracting articles from the *Demography* website
+
+Let's extract the text from [this article](https://read.dukeupress.edu/demography/article/59/2/587/294667/Competing-Effects-on-the-Average-Age-of-Infant) :) First we want to read the html of the webpage:
+
+```{r}
+page <- read_html("https://read.dukeupress.edu/demography/article/59/2/587/294667/Competing-Effects-on-the-Average-Age-of-Infant")
+```
+
+Notice there's a lot of stuff here that we don't really want. It can be difficult to work with this output. I find the easiest thing to do is to go to the webpage you're interested in, right click and View Source. You can then search for the text you're interested in and pull out the relevant bits. Turns out the text in the paper is surrounded by "p"'s (for paragraph) so that helps us a bit:
+
+```{r}
+text <- page %>% 
+  html_nodes("p")  %>% 
+  html_text() %>% 
+  as_tibble()
+
+## get the meta data
+citation_year <- text %>% 
+      filter(str_detect(value, "doi")) %>% 
+      mutate(year = str_extract(value, "20[1,2]\\d")) %>% 
+      mutate(vol_issue = str_extract(value, "\\d{2}\\ \\(\\d\\)")) %>% 
+      rename(citation = value) %>% 
+      slice(1)
+
+
+```
+
+Let's now tidy this up so the text is only the article, and the metadata is joined back on
+
+```{r}
+# tidy up in a convoluted way
+text <- text %>% 
+  mutate(dcf = str_detect(value, "Download citation file")) %>% 
+  mutate(row_number = 1:n()) %>% 
+  mutate(top_matter = row_number<=row_number(dcf)) %>% 
+  filter(!top_matter) %>% 
+  select(-(dcf:top_matter)) %>% 
+  bind_cols(citation_year)
+```
+Great! Now we have (semi) usable data for one article.
+
+# Full dataset set of articles 
+
+You could do the same thing over and over again (looping over a list of URLs) to get a dataset of all available articles. That's what I did earlier, and here's the dataset:
+
+```{r}
+demog <- read_csv(here("data/demog.csv"))
+```
+
+How many articles? There's 719, around, 65-70 per year (apart from in 2022)
+
+```{r}
+demog %>% 
+  group_by(year) %>% 
+  summarize(number_articles = length(unique(citation)))
+```
+
+
+## Tokenize and clean
+
+To start doing some text analysis, let's tokenize our text data into words:
+
+```{r}
+demog_tidy <- demog %>% 
+  unnest_tokens(word, value) 
+```
+Now let's get the word frequencies by article, and remove stop words:
+
+```{r}
+demog_tidy <- demog_tidy %>% 
+  group_by(citation, keywords, issue, volume, year, word) %>% 
+  tally(name = "count") %>% 
+  anti_join(stop_words) 
+```
+
+At this point we may want to do some cleaning up to remove things that aren't words:
+
+```{r}
+demog_tidy <- demog_tidy %>% 
+  filter(!str_detect(word, "\\d")) %>% # numbers
+  filter(str_detect(word, "[a-zA-Z]{2,}")) %>% #at least two letters
+  filter(!str_detect(word, "\\p{Greek}")) %>% #no greek
+  filter(!str_detect(word, "_")) # no underscores
+```
+
+# Word Frequencies and tf-idf
+
+Let's look at the most common words:
+
+```{r}
+demog_tidy %>% 
+  group_by(word) %>% 
+  tally() %>% 
+  top_n(20) %>% 
+  arrange(-n)
+```
+
+We may want to remove al!!
+
+```{r}
+demog_tidy <- demog_tidy %>% 
+  filter(word!="al")
+```
+
+To get an idea of the relative importance of words in particular documents, we can calculate the term frequency - inverse document frequency index (tf-idf).
+
+```{r}
+demog_tidy %>% 
+  bind_tf_idf(word, citation, count) %>% 
+  arrange(-tf_idf) %>% 
+  top_n(20)
+```
+
+# Bi-grams
+
+We can extend the frequency idea to look at groups of words. For example, bi-grams are pairs of words. Now our tokens are not single words but bi-grams: 
+
+```{r}
+bigrams <- demog %>% unnest_tokens(bigram, value, token = "ngrams", n = 2)
+bigrams %>%
+  count(bigram, sort = TRUE) %>% 
+  top_n(20)
+```
+
+Again we may want to remove stop words here and reassess. I've also removed obvious ones we're not interested in (like "online appendix"):
+
+```{r}
+bigrams_separated <- bigrams %>%
+  separate(bigram, c("word1", "word2"), sep = " ")
+
+bigrams_filtered <- bigrams_separated %>%
+  filter(!word1 %in% stop_words$word) %>%
+  filter(!word2 %in% stop_words$word)
+
+bigrams_united <- bigrams_filtered %>%
+  unite(bigram, word1, word2, sep = " ") %>% 
+  filter(bigram!="NA NA")
+
+bigrams_united %>% 
+  group_by(bigram) %>% 
+  tally() %>% 
+  arrange(-n) %>% 
+  filter(!str_detect(bigram, "table\ "), bigram!= "online appendix",
+         !str_detect(bigram, "al "),
+         !str_detect(bigram, "resource")) %>% 
+  top_n(20)
+```
+
+# Sentiment analysis
+
+The `tidytext` package has some built in sentiment lexicons, which we can use to do some basic sentiment analysis of the articles. Let's use the `AFINN` lexicon, which assigns words with a score that runs between -5 and 5, with negative scores indicating negative sentiment and positive scores indicating positive sentiment.
+
+```{r}
+get_sentiments("afinn") %>% head()
+```
+
+Using our tidied, tokenized dataset of the article words, we can join on the AFINN lexicon, which will assign a sentiment score to all relevant words. 
+
+```{r}
+demog_tidy %>% 
+  inner_join(get_sentiments("afinn")) %>% 
+  head()
+```
+
+Top 5 most positive and negative articles
+
+```{r}
+demog_tidy %>% 
+  inner_join(get_sentiments("afinn")) %>% 
+  summarize(mean_sentiment = mean(value)) %>% 
+  ungroup() %>% 
+  arrange(-mean_sentiment) %>% 
+  slice(1:5)
+
+demog_tidy %>% 
+  inner_join(get_sentiments("afinn")) %>% 
+  summarize(mean_sentiment = mean(value)) %>% 
+  ungroup() %>% 
+  arrange(mean_sentiment) %>% 
+  slice(1:5)
+```
+
+
+We can then do some summary statistics over keywords. 
+
+```{r}
+sentiment_by_keyword <- demog_tidy %>% 
+  inner_join(get_sentiments("afinn")) %>% 
+  rowwise() %>% 
+  mutate(first_keyword = str_split(keywords, ",")[[1]][1])  %>% 
+  group_by(first_keyword) %>% 
+  # count the number of articles with this first keyword
+  # simplification here, would probably want to do something 
+  # that takes all keywords into account
+  mutate(n_articles_keyword = length(unique(citation))) %>% 
+  group_by(citation, first_keyword, n_articles_keyword) %>% 
+  summarize(mean_sentiment = mean(value)) %>% 
+  group_by(first_keyword, n_articles_keyword) %>% 
+  summarize(mean_sentiment_keyword = mean(mean_sentiment)) %>% 
+  drop_na() %>% 
+  ungroup()
+  
+```
+
+
+
+Looking at mean sentiment by most common keywords:
+
+```{r}
+sentiment_by_keyword %>% 
+  arrange(-n_articles_keyword) %>% 
+  slice(1:10)
+```
+
+Looking at top 5 most negative and positive:
+
+```{r}
+sentiment_by_keyword %>% 
+  arrange(-mean_sentiment_keyword) %>% 
+  slice(1:5)
+
+sentiment_by_keyword %>% 
+  arrange(mean_sentiment_keyword) %>% 
+  slice(1:5)
+```
+
+# Topic models
+
+Finally, let's use the `topicmodels` package to run LDA on the *Demography* articles. The first step is to convert our tokenized data into a document-term matrix.
+
+```{r}
+demog_dtm <- demog_tidy %>% 
+  cast_dtm(citation, word, count)
+```
+
+We can then estimate a topic model using LDA with 12 topics:
+
+```{r}
+demog_lda <- LDA(demog_dtm, k = 12, control = list(seed = 865))
+```
+
+## Probability of words in topic
+
+In terms of the output, there's two main things of interest. The $\beta$'s give the probability of each word being in a particular topic, which is useful get a sense of the overall topic content. 
+
+```{r}
+demog_topics <- tidy(demog_lda, matrix = "beta")
+```
+
+We can pull out the top 10 words based on probability by topic then plot these:
+
+```{r}
+demog_top_terms <- demog_topics %>% 
+  group_by(topic) %>%
+  filter(term!="al") %>% 
+  slice_max(beta, n = 10) %>% 
+  ungroup() %>%
+  arrange(topic, -beta)
+
+demog_top_terms %>% 
+  mutate(term = reorder_within(term, beta, topic)) %>%
+  ggplot(aes(beta, term, fill = factor(topic))) +
+  geom_col(show.legend = FALSE) +
+  facet_wrap(~ topic, scales = "free") +
+  scale_y_reordered()+
+  labs(title = "Top words by topic", x = "probability of word in topic")
+```
+
+## Probability of articles covering topic
+
+The other quantities of interest are the $\gamma$'s, which give the probability that each document (article) contains a particular topic. 
+
+```{r}
+demog_documents <- tidy(demog_lda, matrix = "gamma")
+```
+
+Let's look at the top 2 articles by topic:
+
+```{r}
+demog_documents %>% 
+  group_by(topic) %>% 
+  arrange(-gamma) %>% 
+  slice(1:2) 
+```
+
+We could also look at some time trends, for example:
+
+```{r}
+demog_documents %>% 
+  rename(citation = document) %>% 
+  left_join(demog %>% select(citation, year)) %>% 
+  group_by(citation) %>% 
+  arrange(-gamma) %>% 
+  slice(1) %>% 
+  group_by(year, topic) %>% 
+  tally() %>% 
+  group_by(year) %>% 
+  mutate(prop  = n/sum(n))  %>% 
+  ggplot(aes(year, prop, fill = factor(topic))) +
+  geom_bar(stat = "identity")+
+  scale_x_continuous(breaks = 2011:2022)+
+  scale_fill_viridis_d(name = "topic")+
+  labs(title = "Proportion of articles by main topic")
+```
+
