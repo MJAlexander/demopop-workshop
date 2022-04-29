@@ -8,7 +8,7 @@ If you want to follow along during the workshop, you will need to get a Twitter 
 
 This R script covers the main things you need, which may be useful to run as a check: [0_setup.R](https://github.com/MJAlexander/demopop-workshop/blob/main/code/0_setup.R).
 
-[Intro and overview slides](https://github.com/MJAlexander/demopop-workshop/blob/gh-pages/intro_overview.html).
+<a href="intro_overview.html" title="Intro and overview slides">Intro and overview slides</a>
 
 # Module 1: Extracting Twitter data
 
