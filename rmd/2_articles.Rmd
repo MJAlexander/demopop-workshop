@@ -270,7 +270,7 @@ demog_dtm <- demog_tidy %>%
 
 We can then estimate a topic model using LDA with 12 topics:
 
-```{r}
+```{r, eval = FALSE}
 demog_lda <- LDA(demog_dtm, k = 12, control = list(seed = 865))
 ```
 
@@ -279,7 +279,12 @@ demog_lda <- LDA(demog_dtm, k = 12, control = list(seed = 865))
 In terms of the output, there's two main things of interest. The $\beta$'s give the probability of each word being in a particular topic, which is useful get a sense of the overall topic content. 
 
 ```{r}
-demog_topics <- tidy(demog_lda, matrix = "beta")
+# this is how you extract betas
+# demog_topics <- tidy(demog_lda, matrix = "beta")
+# write_csv(demog_topics, here("output/betas.csv"))
+
+# load in pre-estimated betas (doing this to save time)
+demog_topics <- read_csv(here("output/betas.csv"))
 ```
 
 We can pull out the top 10 words based on probability by topic then plot these:
@@ -306,7 +311,11 @@ demog_top_terms %>%
 The other quantities of interest are the $\gamma$'s, which give the probability that each document (article) contains a particular topic. 
 
 ```{r}
-demog_documents <- tidy(demog_lda, matrix = "gamma")
+# demog_documents <- tidy(demog_lda, matrix = "gamma")
+# write_csv(demog_documents, here("output/gammas.csv"))
+
+# again loading in pre-saved to save time
+demog_documents <- read_csv(here("output/gammas.csv"))
 ```
 
 Let's look at the top 2 articles by topic:
@@ -331,10 +340,11 @@ demog_documents %>%
   tally() %>% 
   group_by(year) %>% 
   mutate(prop  = n/sum(n))  %>% 
-  ggplot(aes(year, prop, fill = factor(topic))) +
-  geom_bar(stat = "identity")+
-  scale_x_continuous(breaks = 2011:2022)+
-  scale_fill_viridis_d(name = "topic")+
-  labs(title = "Proportion of articles by main topic")
+  filter(topic==7|topic==1, year<2022) %>% 
+  mutate(topic = ifelse(topic==7, "immigration and labor", "neighbourhoods and segregation")) %>% 
+  ggplot(aes(year, prop, color = topic)) + 
+  geom_line() + 
+  scale_x_continuous(breaks = 2011:2021)+
+  labs(title = "Proportion of articles talking about selected topics")
 ```
 
