@@ -14,9 +14,13 @@ To add!
 
 # Module 1: Extracting Twitter data
 
-To add!
+Intro to extracting data from Twitter using the `rtweet` package.
+
+RMarkdown file is [here](https://github.com/MJAlexander/demopop-workshop/blob/main/rmd/1_tweets.Rmd).
 
 # Module 2: Text analysis on *Demography* articles
 
-To add!
+Intro to webscraping using `rvest` and text analysis using `tidytext`.
+
+Rmarkdown file is [here](https://github.com/MJAlexander/demopop-workshop/blob/main/rmd/2_articles.Rmd).
 
