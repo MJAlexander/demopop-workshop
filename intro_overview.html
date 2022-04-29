@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="" xml:lang="">
+  <head>
+    <title>Non-traditional data sources in demography</title>
+    <meta charset="utf-8" />
+    <meta name="author" content="Monica Alexander   University of Toronto" />
+    <script src="libs/header-attrs/header-attrs.js"></script>
+    <script src="https://use.fontawesome.com/5235085b15.js"></script>
+    <link rel="stylesheet" href="xaringan-themer.css" type="text/css" />
+  </head>
+  <body>
+    <textarea id="source">
+class: center, middle, inverse, title-slide
+
+# Non-traditional data sources in demography
+### Monica Alexander <br> University of Toronto
+### DemoPop Workshop, 29 April 2022
+
+---
+
+
+
+
+
+
+# Overview
+
+--
+
+### Motivation
+
+--
+
+### How do we get data?
+
+--
+
+### A whirlwind intro to text analysis
+
+--
+
+### Code tutorials
+
+
+
+---
+
+class: center, middle, inverse
+
+# Motivation
+
+
+---
+
+# Motivation
+
+### What do we mean by 'non-traditional'?
+
+--
+
+- In short, not censuses and surveys!
+
+--
+
+- 'Non-traditional' generally means not primarily collected for research purposes (but still has potential to be useful in this context)
+
+
+--
+
+- The nature in which data is collected and stored has changed dramatically. An increasing share of human interaction, communication and
+culture is being recorded in a digital way
+
+    + Digital records = data that is (potentially) accessible and analyzable
+
+
+--
+
+- Examples
+
+  + **Social Media data**
+  + Digital trace data
+  + Administrative data
+  + **Corpus data** 
+
+
+---
+
+# Social media data
+
+--
+
+- With the rise of social media comes the rise of data
+
+--
+
+- Data about people
+
+    + characteristics, movements, connections, interests, views...
+--
+
+- Potentially rich data sources for population research
+--
+
+- Strengths that traditional data sources often don't have
+
+    + timely
+    
+    + large sample sizes
+    
+    + granular information
+--
+
+- But potential drawbacks as well 
+
+---
+
+# Social media data
+
+--
+
+- Population data from advertising platforms 
+    
+    + aggregate level population estimates by subgroup
+    + useful in demographic estimation
+    + e.g. [Estimating out-migration from Puerto Rico using Facebook ads data](https://onlinelibrary.wiley.com/doi/abs/10.1111/padr.12289)
+
+--
+
+- Individual digital trace data 
+
+    + Individual profiles, friends and behavior
+    + Text / media data, networks
+    + Use to study networks, information spread, opinions, etc
+    + e.g. [Assessing the Russian Internet Research Agency’s impact on the political attitudes and behaviors of American Twitter users in late 2017](https://www.pnas.org/content/pnas/117/1/243.full.pdf)
+    + e.g. [Geography of Twitter networks](https://www.sciencedirect.com/science/article/pii/S0378873311000359?casa_token=_ihyPFLiN3wAAAAA:wlhmucP0-sdp_vwynl23QWEPWjNdj0w1lVAgzA8UjOQzcArTguH2BFt48MVXQc3Vkc-K3cui7Ws)    
+    
+--
+
+- Survey data
+
+    + Use social media platforms to reach and survey people
+    + Timely, hard-to-reach populations, cheap?
+    + e.g. [Behaviours and attitudes in response to the COVID-19 pandemic: insights from a cross-national Facebook survey](https://epjdatascience.springeropen.com/articles/10.1140/epjds/s13688-021-00270-1)
+
+
+
+---
+
+# Corpus data
+
+--
+
+- Large collections or spoken or written language
+
+--
+
+- Treating text as data; nonreactive content analysis
+
+--
+
+- Information encoded in text is a complement to more
+traditional forms of data
+
+--
+
+- Can be text from social media data, other online sources (blogs, Wikipedia), newspapers, Hansard, bills, scholarly articles...
+
+--
+
+- Examples:
+
+    + ['Migration Discourse in Sweden: Frames and Sentiments in Mainstream and Social Media'](https://journals.sagepub.com/doi/full/10.1177/2056305120981059)
+
+    + ['Neutral or Framed? A Sentiment Analysis of 2019 Abortion Laws'](https://link.springer.com/article/10.1007/s13178-022-00690-2)
+
+    + ['A mixed-methods framework for analyzing text data: Integrating computational techniques with qualitative methods in demography'](https://www.jstor.org/stable/26332229?seq=3)
+
+---
+
+# Example: *Demography* articles
+
+![](sm.jpeg)
+
+Example research questions?
+
+---
+
+class: center, middle, inverse
+
+# How do we get data?
+
+---
+
+# How do we get data
+
+--
+
+### Manually?
+
+- I guess you could copy paste info you view on a webpage
+- Slow, hard, not reproducible
+
+--
+
+### Webscraping
+
+- Write code that visit a webpage and extracts data
+- More automated and reproducible
+- Legality and ethical considerations depend on the specifics of what you're doing
+- Some good tips and principles are [here](https://www.tellingstorieswithdata.com/gather-data.html#scraping).
+- `rvest` is a super useful R package here
+
+---
+# How do we get data
+
+--
+
+### Application Programming Interfaces (APIs)
+
+--
+
+- A tool that makes it easier for a computer to query a website's data
+- Most social media websites have APIs, that let you programmatically query and extract data
+- e.g. [Facebook marketing API](https://developers.facebook.com/docs/marketing-apis/)
+- [Twitter API](https://developer.twitter.com/en/docs)
+- e.g. [arXiv API](https://arxiv.org/help/api/)
+
+--
+
+### R packages that help to query APIs
+
+--
+
+- Many packages exist to help R users query APIs
+- We will be using `rtweet` 
+- Others e.g. `rfacebookstat`, `Rlinkedin`, `scholar`...
+
+---
+
+class: center, middle, inverse
+
+# A brief introduction to text analysis
+
+---
+
+# Text as data
+
+--
+
+- Inherently high dimensional. Sample of documents, `\(w\)` words long, `\(p\)` possible words: unique representation is `\(p^w\)` 
+
+--
+
+- We need to simplify (just like any other modeling process)
+
+--
+
+- In general, represent raw text `\(\mathcal{D}\)` as a numerical array `\(\boldsymbol{C}\)`
+
+    + The elements of `\(\boldsymbol{C}\)` are usually counts of *tokens*: words, phrases, etc.
+
+--
+
+- We then use  `\(\boldsymbol{C}\)` to understand characteristics of the underlying text 
+
+    + what words(/phrases) are common/important?
+    + what is the underlying sentiment?
+    + what topics are being talked/written about?
+    
+---
+
+# Tokens 
+
+
+
+- Single words, i.e. take corpus and split into single words
+
+    + simplest, most common
+    
+    + problem of assuming 'bag-of-words'; independence
+
+- *n*-grams e.g. bi-grams are two-word phrases
+  
+    + e.g. "cool climate wines" contains two bi-grams; "cool climate" and "climate wines"
+
+---
+
+# Descriptive measures
+
+
+- Frequencies i.e. just counting the number of times a word/token appears in a document
+
+- tf-idf (term-frequency - inverse document frequency)
+    
+    + For a word or other feature `\(j\)` in document `\(i\)`,
+    term frequency `\(tf_{ij}\)` is the count `\(c_{ij}\)` of occurrences of `\(j\)` in `\(i\)`. 
+    + Inverse document frequency `\(idf_j\)` is
+$$
+\log(n/d_j)
+$$
+
+    where `\(d_j = \sum_{i} \mathbf{1}_{\left[c_{i j}&gt;0\right]}\)` and `\(n\)` is the total number of documents. 
+
+    + tf-idf if the product of these two quantities
+
+---
+
+# Dictionary methods (e.g. sentiment analysis)
+
+--
+
+- Outcome of interest is latent sentiment of document
+
+--
+
+- No estimation involved; just use a pre-specified dictionary that relates words to particular categories of sentiment
+
+--
+
+- Aggregate sentiment values/ratings across documents to get an idea of the relative sentiment within a corpus
+
+--
+
+- For example, is the underlying sentiment in new articles about immigrants associated with the political party in power?
+
+---
+
+# Topic models
+
+Topic models assume that a document is a realization of a mixture of latent topics. The topics themselves are represented by a set of words that are selected from that topic. 
+
+--
+
+- We are trying to model a **generative process**
+
+--
+
+- E.g. a politician first chooses the topics they want to speak about. After choosing the topics, the politician then chooses appropriate words to use for each of those topics.
+
+--
+
+- E.g. a demographer decides the topics they want to write about; then chooses the appropriate words
+
+--
+
+- Each document as a mixture of topics, and each topic as a mixture of words.
+
+- Statistically, topic models consider each document as having been generated by some probability distribution
+over topics. Similarly, each topic is considered a probability distribution over words/terms
+
+--
+
+- There are many different topic models; probably the most common is Latent Dirichlet Allocation (LDA)
+
+
+---
+
+class: center, middle, inverse
+
+# This workshop
+
+
+---
+
+# Plan for the rest of the workshop
+
+--
+
+- Run through two modules: Twitter data (API) and *Demography* (Webscraping)
+
+--
+
+- I will share my screen and go through the code in the RMarkdown files
+
+--
+
+- Questions / comments welcome
+
+--
+
+- Probably too much content??
+
+--
+
+- All materials available, hopefully useful as a starting point for your own learning/research: 
+
+https://mjalexander.github.io/demopop-workshop/
+
+
+
+---
+
+# Let's get started!
+
+### Contact info
+
+&lt;a href="mailto:monica.alexander@utoronto.ca"&gt;&lt;i class="fa fa-paper-plane fa-fw"&gt;&lt;/i&gt;&amp;nbsp; monica.alexander@utoronto.ca&lt;/a&gt;&lt;br&gt;
+
+&lt;a href="monicaalexander.com"&gt;&lt;i class="fa fa-link fa-fw"&gt;&lt;/i&gt;&amp;nbsp; monicaalexander.com&lt;/a&gt;&lt;br&gt;
+
+&lt;a href="http://twitter.com/monjalexander"&gt;&lt;i class="fa fa-twitter fa-fw"&gt;&lt;/i&gt;&amp;nbsp; @monjalexander&lt;/a&gt;&lt;br&gt;
+
+&lt;a href="http://github.com/MJAlexander"&gt;&lt;i class="fa fa-github fa-fw"&gt;&lt;/i&gt;&amp;nbsp; @MJAlexander&lt;/a&gt;&lt;br&gt;
+    </textarea>
+<style data-target="print-only">@media screen {.remark-slide-container{display:block;}.remark-slide-scaler{box-shadow:none;}}</style>
+<script src="https://remarkjs.com/downloads/remark-latest.min.js"></script>
+<script>var slideshow = remark.create({
+"highlightStyle": "github",
+"highlightLines": true,
+"countIncrementalSlides": false
+});
+if (window.HTMLWidgets) slideshow.on('afterShowSlide', function (slide) {
+  window.dispatchEvent(new Event('resize'));
+});
+(function(d) {
+  var s = d.createElement("style"), r = d.querySelector(".remark-slide-scaler");
+  if (!r) return;
+  s.type = "text/css"; s.innerHTML = "@page {size: " + r.style.width + " " + r.style.height +"; }";
+  d.head.appendChild(s);
+})(document);
+
+(function(d) {
+  var el = d.getElementsByClassName("remark-slides-area");
+  if (!el) return;
+  var slide, slides = slideshow.getSlides(), els = el[0].children;
+  for (var i = 1; i < slides.length; i++) {
+    slide = slides[i];
+    if (slide.properties.continued === "true" || slide.properties.count === "false") {
+      els[i - 1].className += ' has-continuation';
+    }
+  }
+  var s = d.createElement("style");
+  s.type = "text/css"; s.innerHTML = "@media print { .has-continuation { display: none; } }";
+  d.head.appendChild(s);
+})(document);
+// delete the temporary CSS (for displaying all slides initially) when the user
+// starts to view slides
+(function() {
+  var deleted = false;
+  slideshow.on('beforeShowSlide', function(slide) {
+    if (deleted) return;
+    var sheets = document.styleSheets, node;
+    for (var i = 0; i < sheets.length; i++) {
+      node = sheets[i].ownerNode;
+      if (node.dataset["target"] !== "print-only") continue;
+      node.parentNode.removeChild(node);
+    }
+    deleted = true;
+  });
+})();
+(function() {
+  "use strict"
+  // Replace <script> tags in slides area to make them executable
+  var scripts = document.querySelectorAll(
+    '.remark-slides-area .remark-slide-container script'
+  );
+  if (!scripts.length) return;
+  for (var i = 0; i < scripts.length; i++) {
+    var s = document.createElement('script');
+    var code = document.createTextNode(scripts[i].textContent);
+    s.appendChild(code);
+    var scriptAttrs = scripts[i].attributes;
+    for (var j = 0; j < scriptAttrs.length; j++) {
+      s.setAttribute(scriptAttrs[j].name, scriptAttrs[j].value);
+    }
+    scripts[i].parentElement.replaceChild(s, scripts[i]);
+  }
+})();
+(function() {
+  var links = document.getElementsByTagName('a');
+  for (var i = 0; i < links.length; i++) {
+    if (/^(https?:)?\/\//.test(links[i].getAttribute('href'))) {
+      links[i].target = '_blank';
+    }
+  }
+})();
+// adds .remark-code-has-line-highlighted class to <pre> parent elements
+// of code chunks containing highlighted lines with class .remark-code-line-highlighted
+(function(d) {
+  const hlines = d.querySelectorAll('.remark-code-line-highlighted');
+  const preParents = [];
+  const findPreParent = function(line, p = 0) {
+    if (p > 1) return null; // traverse up no further than grandparent
+    const el = line.parentElement;
+    return el.tagName === "PRE" ? el : findPreParent(el, ++p);
+  };
+
+  for (let line of hlines) {
+    let pre = findPreParent(line);
+    if (pre && !preParents.includes(pre)) preParents.push(pre);
+  }
+  preParents.forEach(p => p.classList.add("remark-code-has-line-highlighted"));
+})(document);</script>
+
+<script>
+slideshow._releaseMath = function(el) {
+  var i, text, code, codes = el.getElementsByTagName('code');
+  for (i = 0; i < codes.length;) {
+    code = codes[i];
+    if (code.parentNode.tagName !== 'PRE' && code.childElementCount === 0) {
+      text = code.textContent;
+      if (/^\\\((.|\s)+\\\)$/.test(text) || /^\\\[(.|\s)+\\\]$/.test(text) ||
+          /^\$\$(.|\s)+\$\$$/.test(text) ||
+          /^\\begin\{([^}]+)\}(.|\s)+\\end\{[^}]+\}$/.test(text)) {
+        code.outerHTML = code.innerHTML;  // remove <code></code>
+        continue;
+      }
+    }
+    i++;
+  }
+};
+slideshow._releaseMath(document);
+</script>
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+(function () {
+  var script = document.createElement('script');
+  script.type = 'text/javascript';
+  script.src  = 'https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-MML-AM_CHTML';
+  if (location.protocol !== 'file:' && /^https?:/.test(script.src))
+    script.src  = script.src.replace(/^https?:/, '');
+  document.getElementsByTagName('head')[0].appendChild(script);
+})();
+</script>
+  </body>
+</html>
